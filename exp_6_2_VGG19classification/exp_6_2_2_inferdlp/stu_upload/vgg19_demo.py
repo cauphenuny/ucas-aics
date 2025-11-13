@@ -94,16 +94,16 @@ class VGG19(object):
                 # TODO：调整权重形状
                 # matconvnet: weights dim [height, width, in_channel, out_channel]
                 # ours: weights dim [out_channel, height, width,in_channel]
-                weight = einops.rearrange(weight, 'h w i o -> i h w o')
-                bias = bias.reshape(-1).astype(np.float64)
+                weight = einops.rearrange(weight, 'h w i o -> o h w i').flatten().astype(float)
+                bias = bias.reshape(-1).astype(float)
                 self.net.loadParams(idx, weight, bias)
                 count += 1
             if 'fc' in self.net.getLayerName(idx):
                 # Loading params may take quite a while. Please be patient.
                 weight, bias = params['layers'][0][idx][0][0][0][0]
                 weight = weight.reshape([weight.shape[0]*weight.shape[1]*weight.shape[2], weight.shape[3]])
-                weight = weight.flatten().astype(np.float64)
-                bias = bias.reshape(-1).astype(np.float64)
+                weight = weight.flatten().astype(float)
+                bias = bias.reshape(-1).astype(float)
                 self.net.loadParams(idx, weight, bias)
                 count += 1
 
@@ -119,7 +119,7 @@ class VGG19(object):
         input_image -= image_mean
         input_image = np.reshape(input_image, [1]+list(input_image.shape))
         # TODO：调整输入数据
-        input_data = input_image.flatten().astype(np.float64)
+        input_data = input_image.flatten().astype(float)
         
         self.net.setInputData(input_data)
 
