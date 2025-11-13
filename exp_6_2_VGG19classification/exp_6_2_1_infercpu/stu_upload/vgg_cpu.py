@@ -36,7 +36,7 @@ class VGG19(object):
         print('Building vgg-19 model...')
 
         self.layers = {}
-        nchannels = [3, 64, 128, 512, 512]
+        nchannels = [3, 64, 128, 256, 512, 512]
         nblocks = [2, 2, 4, 4, 4]
         for layer in [1, 2, 3, 4, 5]:
             for block in range(1, nblocks[layer-1]+1):
