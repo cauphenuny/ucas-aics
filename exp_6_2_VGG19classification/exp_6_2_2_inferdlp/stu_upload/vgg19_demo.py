@@ -6,6 +6,7 @@ import os
 import scipy.io
 from PIL import Image
 import imageio.v2 as imageio
+import einops
 
 class VGG19(object):
     def __init__(self):
@@ -19,66 +20,65 @@ class VGG19(object):
     def build_model(self, param_path='../../imagenet-vgg-verydeep-19.mat'):
         self.param_path = param_path
 
-       
         # TODO: 使用net的createXXXLayer接口搭建VGG19网络
         # creating layers
         self.net.setInputShape(1, 3, 224, 224)
-        # conv1_1
-       
-        input_shape1=pycnnl.IntVector(4)
-        input_shape1[0]=1
-        input_shape1[1]=3
-        input_shape1[2]=224
-        input_shape1[3]=224
-        self.net.createConvLayer('conv1_1', input_shape1,64, 3, 1, 1, 1)
-             
-        # relu1_1
-        self.net.createReLuLayer('relu1_1')
-        # conv1_2
         
-        input_shape12=pycnnl.IntVector(4)
-        input_shape12[0]=1
-        input_shape12[1]=64
-        input_shape12[2]=224
-        input_shape12[3]=224
+        input_height = input_width = 224
+        in_channels = 3
 
-        self.net.createConvLayer('conv1_2',input_shape12, 64, 3, 1, 1, 1)
-        
-        # relu1_2
-        self.net.createReLuLayer('relu1_2')
-        
-        __________________________________
-        __________________________________
-        __________________________________
-        # fc8
-        
-        input_shapem3=pycnnl.IntVector(4)
-        input_shapem3[0]=1
-        input_shapem3[1]=1
-        input_shapem3[2]=1
-        input_shapem3[3]=4096
-        weight_shapem3=pycnnl.IntVector(4)
-        weight_shapem3[0]=1
-        weight_shapem3[1]=1
-        weight_shapem3[2]=4096
-        weight_shapem3[3]=1000
-        output_shapem3=pycnnl.IntVector(4)
-        output_shapem3[0]=1
-        output_shapem3[1]=1
-        output_shapem3[2]=1
-        output_shapem3[3]=1000
+        def vector(*args):
+            vec = pycnnl.IntVector(len(args))
+            for i, val in enumerate(args):
+                vec[i] = val
+            data = ", ".join(str(vec[i]) for i in range(len(args)))
+            print(f'{self.__class__.__name__}: Create vector with values: {data}')
+            return vec
 
-        self.net.createMlpLayer('fc8', input_shapem3,weight_shapem3,output_shapem3)
+        def add_conv(layer_name, out_channels, kernel_size=3, stride=1, padding=1, relu=True):
+            nonlocal in_channels, input_height, input_width
+            print(f'{self.__class__.__name__}: Add conv layer {layer_name}, i={in_channels}, o={out_channels}, h={input_height}, w={input_width}')
+            input_shape=vector(1, in_channels, input_height, input_width)
+            # validate shapes before creating layer to catch negative dims early
+            if in_channels <= 0 or input_height <= 0 or input_width <= 0:
+                raise ValueError(f'Invalid shape for conv {layer_name}: in_ch={in_channels}, h={input_height}, w={input_width}')
+            # createConvLayer expects (name, input_shape, in_channels, out_channels, ...)
+            self.net.createConvLayer(layer_name, input_shape, in_channels, out_channels, kernel_size, stride, padding)
+            in_channels = out_channels
+            input_height = (input_height - kernel_size + 2 * padding) // stride + 1
+            input_width = (input_width - kernel_size + 2 * padding) // stride + 1
+            if relu:
+                self.net.createReLuLayer(layer_name.replace('conv', 'relu'))
         
+        def add_pool(layer_name, pool_size=2, stride=2):
+            nonlocal input_height, input_width
+            pool_input_shape=vector(1, in_channels, input_height, input_width)
+            self.net.createPoolingLayer(layer_name, pool_input_shape, pool_size, stride)
+            input_height = input_height // stride
+            input_width = input_width // stride
+        
+        nchannels = [3, 64, 128, 256, 512, 512]
+        nblocks = [0, 2, 2, 4, 4, 4]
+        for layer in [1, 2, 3, 4, 5]:
+            for block in range(1, nblocks[layer]+1):
+                add_conv(f'conv{layer}_{block}', nchannels[layer])
+            add_pool(f'pool{layer}')
+        
+        def add_fc(name, input_size, output_size, relu=True):
+            input_shapem3=vector(1, 1, 1, input_size)
+            weight_shapem3=vector(1, 1, input_size, output_size)
+            output_shapem3=vector(1, 1, 1, output_size)
+            self.net.createMlpLayer(name, input_shapem3,weight_shapem3,output_shapem3)
+            if relu:
+                self.net.createReLuLayer(name.replace('fc', 'relu'))
+        
+        add_fc('fc6', in_channels * input_height * input_width, 4096)
+        add_fc('fc7', 4096, 4096)
+        add_fc('fc8', 4096, 1000, relu=False)
+
         # softmax
-        
-        input_shapes=pycnnl.IntVector(3)
-        input_shapes[0]=1
-        input_shapes[1]=1
-        input_shapes[2]=1000
-    
-
-        self.net.createSoftmaxLayer('softmax',input_shapes ,1)
+        input_shapes=vector(1, 1, 1000)
+        self.net.createSoftmaxLayer('softmax', input_shapes, 1)
     
     def load_model(self):
         # loading params ... 
@@ -94,7 +94,7 @@ class VGG19(object):
                 # TODO：调整权重形状
                 # matconvnet: weights dim [height, width, in_channel, out_channel]
                 # ours: weights dim [out_channel, height, width,in_channel]
-                weight = ______________________________
+                weight = einops.rearrange(weight, 'h w i o -> i h w o')
                 bias = bias.reshape(-1).astype(np.float64)
                 self.net.loadParams(idx, weight, bias)
                 count += 1
@@ -102,10 +102,8 @@ class VGG19(object):
                 # Loading params may take quite a while. Please be patient.
                 weight, bias = params['layers'][0][idx][0][0][0][0]
                 weight = weight.reshape([weight.shape[0]*weight.shape[1]*weight.shape[2], weight.shape[3]])
-                weight = _______________________________
+                weight = weight.flatten().astype(np.float64)
                 bias = bias.reshape(-1).astype(np.float64)
-
-            
                 self.net.loadParams(idx, weight, bias)
                 count += 1
 
@@ -121,7 +119,7 @@ class VGG19(object):
         input_image -= image_mean
         input_image = np.reshape(input_image, [1]+list(input_image.shape))
         # TODO：调整输入数据
-        input_data = ________________________
+        input_data = input_image.flatten().astype(np.float64)
         
         self.net.setInputData(input_data)
 
