@@ -43,7 +43,7 @@ class VGG19(object):
             if in_channels <= 0 or input_height <= 0 or input_width <= 0:
                 raise ValueError(f'Invalid shape for conv {layer_name}: in_ch={in_channels}, h={input_height}, w={input_width}')
             # createConvLayer expects (name, input_shape, in_channels, out_channels, ...)
-            self.net.createConvLayer(layer_name, input_shape, in_channels, out_channels, kernel_size, stride, padding)
+            self.net.createConvLayer(layer_name, input_shape, out_channels, kernel_size, stride, padding, 1)
             in_channels = out_channels
             input_height = (input_height - kernel_size + 2 * padding) // stride + 1
             input_width = (input_width - kernel_size + 2 * padding) // stride + 1
