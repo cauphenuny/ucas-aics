@@ -1,0 +1,3 @@
+补全stu_upload中的文件，执行main_infer_dlp.py 运行实验
+
+注意：使用pycnnl创建vgg网络不需要flatten层
