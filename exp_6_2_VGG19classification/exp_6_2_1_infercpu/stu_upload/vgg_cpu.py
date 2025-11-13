@@ -5,6 +5,7 @@ import scipy.io
 import time
 import sys
 import cv2
+import einops
 from PIL import Image
 import imageio.v2 as imageio
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -35,14 +36,25 @@ class VGG19(object):
         print('Building vgg-19 model...')
 
         self.layers = {}
-        self.layers['conv1_1'] = ConvolutionalLayer(3, 3, 64, 1, 1)
-        self.layers['relu1_1'] = ReLULayer()
-        _______________________________
-        _______________________________
-        _______________________________
-
+        nchannels = [3, 64, 128, 512, 512]
+        nblocks = [2, 2, 4, 4, 4]
+        for layer in [1, 2, 3, 4, 5]:
+            for block in range(1, nblocks[layer-1]+1):
+                self.layers[f'conv{layer}_{block}'] = ConvolutionalLayer(
+                    kernel_size=3, 
+                    channel_in=nchannels[layer] if block > 1 else nchannels[layer-1], 
+                    channel_out=nchannels[layer],
+                    padding=1,
+                    stride=1,
+                )
+                self.layers[f'relu{layer}_{block}'] = ReLULayer()
+            self.layers[f'pool{layer}'] = MaxPoolingLayer(2, 2)
+        self.layers['flatten'] = FlattenLayer([512, 7, 7], [512*7*7])
+        self.layers['fc6'] = FullyConnectedLayer(512*7*7, 4096)
+        self.layers['relu6'] = ReLULayer()
+        self.layers['fc7'] = FullyConnectedLayer(4096, 4096)
+        self.layers['relu7'] = ReLULayer()
         self.layers['fc8'] = FullyConnectedLayer(4096, 1000)
-
         self.layers['softmax'] = SoftmaxLossLayer()
 
         self.update_layer_list = []
@@ -69,12 +81,13 @@ class VGG19(object):
                 # matconvnet: weights dim [height, width, in_channel, out_channel]
                 # ours: weights dim [in_channel, height, width, out_channel]
                 # TODO：调整参数的形状
-                weight = ______________________
-                bias = ______________________
+                weight = einops.rearrange(weight, 'h w i o -> i h w o')
+                bias = bias.reshape(-1)
+                self.layers[self.param_layer_name[idx]].load_param(weight, bias)
                 self.layers[self.param_layer_name[idx]].load_param(weight, bias)
             if idx >= 37 and 'fc' in self.param_layer_name[idx]:
                 weight, bias = params['layers'][0][idx-1][0][0][0][0]
-                weight = ___________________________________
+                weight = weight.reshape([-1, weight.shape[3]])
                 self.layers[self.param_layer_name[idx]].load_param(weight, bias)
 
     def load_image(self, image_dir):
@@ -87,7 +100,7 @@ class VGG19(object):
         self.input_image = np.reshape(self.input_image, [1]+list(self.input_image.shape))
         # input dim [N, channel, height, width]
         # TODO：调整图片维度顺序
-        self.input_image = ________________________
+        self.input_image = einops.rearrange(self.input_image, 'n h w c -> n c h w')
 
     def forward(self):
         # TODO：神经网络的前向传播
@@ -96,13 +109,13 @@ class VGG19(object):
         current = self.input_image
         for idx in range(len(self.param_layer_name)):
             print('Inferencing layer: ' + self.param_layer_name[idx])
-            current = __________________________________
+            current = self.layers[self.param_layer_name[idx]].forward(current)
         print('Inference time: %f' % (time.time()-start_time))
         return current
 
     def evaluate(self):
         # TODO：获取神经网络前向传播的结果
-        prob = _________________________
+        prob = self.forward()
         top1 = np.argmax(prob[0])
         print('Classification result: id = %d, prob = %f' % (top1, prob[0, top1]))
 
