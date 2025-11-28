@@ -175,3 +175,8 @@ data/
 **/*data/**
 *.mat
 **/*.npy
+
+logs/
+*.pth
+out/
+*.swp
