@@ -13,7 +13,6 @@ from evaluate_cnnl_mfus import TransNet, COCODataSet
 if __name__ == '__main__':
     # TODO: 使用cpu生成图像转换网络模型并保存在g_net中
     g_net = TransNet().cpu()
-    print(g_net)
     # TODO: 从/models文件夹下加载网络参数到g_net中
     g_net.load_state_dict(torch.load("./models/fst.pth", map_location="cpu"))
     print("g_net build  PASS!\n")
