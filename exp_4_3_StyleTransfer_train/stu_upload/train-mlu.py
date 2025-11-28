@@ -8,7 +8,7 @@ import torch_mlu
 import cv2
 import numpy
 import os
-from train import TransNet, VGG19, load_image
+from train import TransNet, VGG19, load_image, COCODataSet
 
 os.putenv('MLU_VISIBLE_DEVICES','0')
 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     mlu_net = net.to("mlu")
     print("mlu_net build PASS!\n")
     # TODO: 使用adam优化器对mlu_g_net的参数进行优化
-    optimizer = torch.nn.optim.Adam(mlu_g_net.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(mlu_g_net.parameters(), lr=0.001)
     # TODO: 在cpu上计算均方误差损失函得到loss_func
     loss_func = torch.nn.MSELoss()
     # TODO: 将损失函数加载到mlu上得到mlu_loss_func
@@ -107,7 +107,7 @@ if __name__ == '__main__':
                 # TODO: 利用save_image函数将tensor形式的生成图像mlu_image_g以及输入图像mlu_image_c以jpg左右拼接的形式保存在/out/train_mlu/文件夹下
                 save_image(
                     torch.cat((mlu_image_g, mlu_image_c), dim=3),
-                    f"/out/train_mlu/{j}_{i}.jpg",
+                    f"./out/train_mlu/{j}_{i}.jpg",
                 )
         j += 1
 
