@@ -4,12 +4,20 @@ import torch
 import cv2
 import numpy
 import einops
+import os
+
+def find(base: str) -> str:
+    for i in range(5):
+        candidate = os.path.join("../" * i, base)
+        if os.path.exists(candidate):
+            return candidate
+    raise FileNotFoundError(f"cannot find {base} in parent directories, cwd={os.getcwd()}")
 
 class COCODataSet(Dataset):
 
     def __init__(self):
         super(COCODataSet, self).__init__()
-        self.zip_files = ZipFile('./data/train2014_small.zip')
+        self.zip_files = ZipFile(find('data/train2014_small.zip'))
         self.data_set = []
         for file_name in self.zip_files.namelist():
             if file_name.endswith('.jpg'):
