@@ -3,7 +3,7 @@ import torch
 import torchvision
 import numpy as np
 #TODO：导入自定义连接库
-import mysigmoid
+import op_mysigmoid.mysigmoid as mysigmoid
 import os, torch, ctypes
 torch_lib = os.path.join(os.path.dirname(torch.__file__), "lib")
 ctypes.CDLL(os.path.join(torch_lib, "libc10.so"))

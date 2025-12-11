@@ -3,7 +3,7 @@ from torch import nn
 import os, torch, ctypes
 torch_lib = os.path.join(os.path.dirname(torch.__file__), "lib")
 ctypes.CDLL(os.path.join(torch_lib, "libc10.so"))
-import mysigmoid
+import op_mysigmoid.mysigmoid as mysigmoid
 from resblock import ResBlock
 
 class TransNet(nn.Module):
